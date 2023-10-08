@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -39,9 +38,37 @@ type Week struct {
 	Sunday    bool
 }
 
+func (w *Week) GetCountOfDays() uint64 {
+	var (
+		count uint64 = 0
+	)
+	if w.Monday {
+		count++
+	}
+	if w.Tuesday {
+		count++
+	}
+	if w.Wednesday {
+		count++
+	}
+	if w.Thursday {
+		count++
+	}
+	if w.Friday {
+		count++
+	}
+	if w.Saturday {
+		count++
+	}
+	if w.Sunday {
+		count++
+	}
+	return count
+}
+
 func (w *Week) GetWeekdays() []time.Weekday {
 	var (
-		weekdays []time.Weekday
+		weekdays []time.Weekday = make([]time.Weekday, 0, 1)
 	)
 	if w.Monday {
 		weekdays = append(weekdays, time.Monday)
@@ -67,7 +94,32 @@ func (w *Week) GetWeekdays() []time.Weekday {
 	return weekdays
 }
 
+func (w *Week) Contains(weekday *time.Weekday) bool {
+	switch *weekday {
+	case time.Monday:
+		return w.Monday
+	case time.Tuesday:
+		return w.Tuesday
+	case time.Wednesday:
+		return w.Wednesday
+	case time.Thursday:
+		return w.Thursday
+	case time.Friday:
+		return w.Friday
+	case time.Saturday:
+		return w.Saturday
+	case time.Sunday:
+		return w.Sunday
+	default:
+		return false
+	}
+}
+
 func main() {
+	startProgramm()
+}
+
+func startProgramm() {
 	var (
 		week *Week = new(Week)
 	)
@@ -78,7 +130,6 @@ func main() {
 		Height: 700,
 	})
 	display := widget.NewEntry()
-	// enter := widget.NewEntry()
 	scroll := container.NewVScroll(display)
 	scroll.SetMinSize(fyne.NewSize(500, 500))
 
@@ -86,7 +137,6 @@ func main() {
 	errorLabel := widget.NewLabel("")
 	buttonMonday := widget.NewCheck("Понедельник", func(value bool) {
 		week.Monday = value
-
 	})
 	buttonTuesday := widget.NewCheck("Вторник", func(value bool) {
 		week.Tuesday = value
@@ -107,7 +157,14 @@ func main() {
 		week.Sunday = value
 	})
 	buttonStart := widget.NewButton("Получить даты", func() {
-		setWeekdays(currentDate, display, errorLabel, week.GetWeekdays())
+		display.Refresh()
+		errorLabel.Refresh()
+		countOfDays := week.GetCountOfDays()
+		if countOfDays != 0 {
+			if err := setWeekdays(currentDate, display, errorLabel, week, countOfDays); err != nil {
+				errorLabel.SetText(err.Error())
+			}
+		}
 	})
 
 	window.SetContent(container.NewVBox(
@@ -127,31 +184,31 @@ func main() {
 	window.ShowAndRun()
 }
 
-func setWeekdays(currentDate *widget.Entry, display *widget.Entry, errorLabel *widget.Label, weekdays []time.Weekday) {
-	display.SetText("")
+func setWeekdays(currentDate *widget.Entry, display *widget.Entry, errorLabel *widget.Label, week *Week, countOfDays uint64) error {
 	now, err := time.Parse(format, currentDate.Text)
 	if err != nil {
-		errorLabel.SetText(fmt.Sprintf("Неверный формат данных. Должен быть %s", format))
-		return
+		return fmt.Errorf(fmt.Sprintf("Неверный формат данных. Должен быть %s", format))
 	}
 	var (
-		finishDate    = time.Date(now.Year()+1, now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		stringBuilder = strings.Builder{}
-		weekDayInYear = 52
+		finishDate           = time.Date(now.Year()+1, now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		stringBuilder        = strings.Builder{}
+		weekDayInYear uint64 = 52
 	)
-	stringBuilder.Grow(weekDayInYear * len(weekdays))
-	stringBuilder.WriteString(getDateByWeekdays(weekdays, now))
+	stringBuilder.Grow(int(weekDayInYear * countOfDays))
+	stringBuilder.WriteString(getDateByWeekdays(week, &now))
 	for now.UnixNano() < finishDate.UnixNano() {
 		now = now.AddDate(0, 0, 1)
-		stringBuilder.WriteString(getDateByWeekdays(weekdays, now))
+		stringBuilder.WriteString(getDateByWeekdays(week, &now))
 	}
 	display.SetText(stringBuilder.String())
 	stringBuilder.Reset()
+	return nil
 }
 
-func getDateByWeekdays(dayOfWeek []time.Weekday, now time.Time) string {
-	if slices.Contains(dayOfWeek, now.Weekday()) {
-		return fmt.Sprintln(mapWeekday[now.Weekday()] + " : " + monday.Format(now, format, monday.LocaleRuRU))
+func getDateByWeekdays(week *Week, now *time.Time) string {
+	weekday := now.Weekday()
+	if week.Contains(&weekday) {
+		return fmt.Sprintln(mapWeekday[now.Weekday()] + " : " + monday.Format(*now, format, monday.LocaleRuRU))
 	}
 	return ""
 }
